@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) landing page for Zucarto, integrated with the deployed platform app.
+This is a [Next.js](https://nextjs.org) marketing site for Zucarto. It does not redirect visitors to the CarbonMRV product; access is handled through verification and follow-up.
 
 ## Getting Started
 
@@ -22,7 +22,6 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 1. Create a local `.env` file in project root.
 2. Set these values:
-   - `NEXT_PUBLIC_APP_URL` -> frontend app URL (example: `https://zucarto-carbon-frontend.onrender.com`)
    - `NEXT_PUBLIC_DEMO_EMAIL` -> sales/support contact mailbox
    - `MONGODB_URL` -> MongoDB connection string (server-side only)
    - `MONGODB_DB_NAME` -> database name (example: `zucarto_production`)
@@ -30,11 +29,9 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 ## Access Request Storage
 
-- The landing page includes a `Request Access` form.
-- Submissions are sent to `POST /api/connect-requests`.
-- Records are stored in:
-  - `connect_requests` (lead + approval workflow source)
-  - `websitelogin` (index prepared for approved user provisioning)
+- **Request access** form: `POST /api/connect-requests` -> `connect_requests` collection.
+- **Sign-in page** at `/login`: `POST /api/website-login` -> `websitelogin` (email and name only; the password field is not stored or transmitted).
+- After a successful sign-in request, the user sees a thank-you message and is not redirected to the product.
 
 ## Key and Secret Handling
 

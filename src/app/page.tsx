@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion, useInView, animate, AnimatePresence } from "framer-motion";
 import {
   Leaf,
@@ -26,9 +27,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zucarto-carbon-frontend.onrender.com";
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "hello@zucarto.com";
-type PlatformStatus = "checking" | "live" | "unavailable";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
 
 // ─── Animated counter ────────────────────────────────────────────────────────
@@ -93,7 +92,6 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
-  const [platformStatus, setPlatformStatus] = useState<PlatformStatus>("checking");
   const [requestStatus, setRequestStatus] = useState<RequestStatus>("idle");
   const [requestError, setRequestError] = useState("");
   const [requestForm, setRequestForm] = useState({
@@ -198,40 +196,6 @@ export default function Home() {
     "Third-Party Standard Alignment",
   ];
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkPlatformStatus = async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      try {
-        // `no-cors` allows a reachability check against cross-origin frontend deployments.
-        await fetch(APP_URL, {
-          method: "GET",
-          mode: "no-cors",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (isMounted) setPlatformStatus("live");
-      } catch {
-        if (isMounted) setPlatformStatus("unavailable");
-      } finally {
-        clearTimeout(timeout);
-      }
-    };
-
-    void checkPlatformStatus();
-    const intervalId = setInterval(() => {
-      void checkPlatformStatus();
-    }, 60000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, []);
-
   const handleRequestSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRequestStatus("submitting");
@@ -283,29 +247,17 @@ export default function Home() {
         <div className="max-w-[1280px] mx-auto px-6 h-[70px] flex items-center justify-between">
 
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <div className="relative w-9 h-9 rounded-xl bg-[#0D6E6E]/60 border border-[#00E5A0]/40 flex items-center justify-center shadow-[0_0_12px_rgba(0,229,160,0.15)]">
               <Leaf className="w-3.5 h-3.5 text-[#00E5A0] absolute top-1 right-1" />
               <MapIcon className="w-4.5 h-4.5 text-white" />
             </div>
             <span className="font-bold text-[18px] tracking-wide text-white drop-shadow-md">Zucarto</span>
             <span className="hidden sm:flex items-center gap-1.5 ml-3 text-[10px] font-bold text-[#00E5A0] border border-[#00E5A0]/30 rounded-full px-2 py-0.5 bg-[#00E5A0]/10 shadow-[0_0_8px_rgba(0,229,160,0.15)]">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  platformStatus === "live"
-                    ? "bg-[#00E5A0] animate-pulse"
-                    : platformStatus === "checking"
-                      ? "bg-amber-400 animate-pulse"
-                      : "bg-red-400"
-                }`}
-              />
-              {platformStatus === "live"
-                ? "Platform Live"
-                : platformStatus === "checking"
-                  ? "Checking Status"
-                  : "Platform Unavailable"}
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5A0] animate-pulse" />
+              Verification access
             </span>
-          </a>
+          </Link>
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-7 text-[14px] font-semibold text-[#8EBAC0]">
@@ -317,20 +269,16 @@ export default function Home() {
           {/* Desktop CTAs */}
           <div className="hidden lg:flex items-center gap-5">
             <a
-              href={`${APP_URL}/login`}
-              target="_blank"
-              rel="noreferrer"
+              href="/login"
               className="text-[14px] font-semibold text-[#8EBAC0] hover:text-white transition-colors"
             >
               Log In
             </a>
             <a
-              href={APP_URL}
-              target="_blank"
-              rel="noreferrer"
+              href="#request-access"
               className="bg-[#00E5A0] text-[#05090a] font-bold px-5 py-2.5 rounded-full text-[13px] flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,160,0.4)] hover:shadow-[0_0_25px_rgba(0,229,160,0.6)] hover:bg-white transition-all transform hover:-translate-y-0.5"
             >
-              Open Platform <ArrowUpRight className="w-3.5 h-3.5" />
+              Request access <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           </div>
 
@@ -358,20 +306,18 @@ export default function Home() {
               ))}
               <div className="pt-4 flex flex-col gap-3">
                 <a
-                  href={`${APP_URL}/login`}
-                  target="_blank"
-                  rel="noreferrer"
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="bg-transparent border border-white/20 text-white font-bold rounded-full py-3 text-sm text-center"
                 >
                   Log In
                 </a>
                 <a
-                  href={APP_URL}
-                  target="_blank"
-                  rel="noreferrer"
+                  href="#request-access"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="bg-[#00E5A0] text-[#05090a] font-bold rounded-full py-3 text-sm flex justify-center items-center gap-2"
                 >
-                  Open Platform <ArrowUpRight className="w-4 h-4" />
+                  Request access <ArrowUpRight className="w-4 h-4" />
                 </a>
               </div>
             </motion.div>
@@ -455,12 +401,10 @@ export default function Home() {
               <BarChart3 className="w-4.5 h-4.5" /> Request Access
             </a>
             <a
-              href={`${APP_URL}/login`}
-              target="_blank"
-              rel="noreferrer"
+              href="/login"
               className="w-full sm:w-auto bg-[#173032] hover:bg-[#1E3E40] border border-white/10 text-white font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-lg transition-all transform hover:-translate-y-1"
             >
-              <Sprout className="w-4.5 h-4.5 text-[#00E5A0]" /> Explore Nexus Agri
+              <Sprout className="w-4.5 h-4.5 text-[#00E5A0]" /> Sign in (CarbonMRV)
             </a>
           </motion.div>
         </div>
@@ -513,6 +457,8 @@ export default function Home() {
           {/* Tabs */}
           <div className="flex flex-wrap items-center justify-center gap-2 mb-8 p-1.5 bg-[#122627] rounded-xl border border-white/10 shadow-lg max-w-max mx-auto">
             <button
+              id="carbon"
+              type="button"
               onClick={() => setActiveProductTab("carbon")}
               className={`px-6 py-2.5 text-[14px] font-bold rounded-lg transition-all flex items-center gap-2 ${
                 activeProductTab === "carbon"
@@ -523,6 +469,8 @@ export default function Home() {
               <BarChart3 className="w-4.5 h-4.5" /> Carbon MRV
             </button>
             <button
+              id="nexus"
+              type="button"
               onClick={() => setActiveProductTab("nexus")}
               className={`px-6 py-2.5 text-[14px] font-bold rounded-lg transition-all flex items-center gap-2 ${
                 activeProductTab === "nexus"
@@ -573,12 +521,10 @@ export default function Home() {
                       ))}
                     </ul>
                     <a
-                      href={APP_URL}
-                      target="_blank"
-                      rel="noreferrer"
+                      href="/login"
                       className="bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md"
                     >
-                      Start Carbon Workflow <ChevronRight className="w-4 h-4" />
+                      CarbonMRV sign-in <ChevronRight className="w-4 h-4" />
                     </a>
                   </div>
                   {/* Right side visual */}
@@ -642,12 +588,10 @@ export default function Home() {
                       ))}
                     </ul>
                     <a
-                      href={APP_URL}
-                      target="_blank"
-                      rel="noreferrer"
+                      href="/login"
                       className="bg-white hover:bg-gray-200 text-[#05090a] py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md"
                     >
-                      Launch Nexus Module <ChevronRight className="w-4 h-4" />
+                      Learn more — sign in <ChevronRight className="w-4 h-4" />
                     </a>
                   </div>
                    {/* Right side visual */}
@@ -852,9 +796,7 @@ export default function Home() {
               <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Standard Level Outputs</li>
             </ul>
             <a
-              href={`${APP_URL}/login`}
-              target="_blank"
-              rel="noreferrer"
+              href="/login"
               className="w-full bg-[#1A3333] hover:bg-[#204040] border border-white/10 text-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-sm text-center"
             >
               Start Pilot
@@ -904,54 +846,26 @@ export default function Home() {
         </div>
       </SectionWrapper>
 
-      {/* ── I. Integration Guide ───────────────────────────────────────────── */}
+      {/* ── I. How access works ──────────────────────────────────────────── */}
       <SectionWrapper id="integrations" className="py-8 md:py-12">
         <div className="bg-[#0E1A1A] border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-            <div>
-              <SectionLabel>Live Integrations</SectionLabel>
-              <h3 className="text-[1.6rem] md:text-[2rem] font-bold text-white">Production Endpoints Connected</h3>
-            </div>
-            <a
-              href={APP_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-[#00E5A0] text-[#05090a] font-bold px-5 py-2.5 rounded-full text-[13px] inline-flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,160,0.35)]"
-            >
-              Open Deployed App <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4 text-[14px]">
-            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
-              <div className="text-[#7A9A9E] mb-1">Frontend App URL</div>
-              <div className="text-white font-semibold break-all">{APP_URL}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
-              <div className="text-[#7A9A9E] mb-1">Authentication</div>
-              <div className="text-white font-semibold break-all">
-                Managed inside the deployed app
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#122627] px-3 py-1.5 text-[12px] font-semibold text-[#B9CBCD]">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                platformStatus === "live"
-                  ? "bg-[#00E5A0]"
-                  : platformStatus === "checking"
-                    ? "bg-amber-400"
-                    : "bg-red-400"
-              }`}
-            />
-            {platformStatus === "live"
-              ? "Live status confirmed"
-              : platformStatus === "checking"
-                ? "Checking live status"
-                : "Live status unavailable"}
-          </div>
-          <p className="mt-5 text-[13px] text-[#8EBAC0]">
-            Public values are safe for browser use. Secrets must stay in server-side environment variables only.
+          <SectionLabel>Access &amp; verification</SectionLabel>
+          <h3 className="text-[1.6rem] md:text-[2rem] font-bold text-white mb-3">No automatic redirect to the product</h3>
+          <p className="text-[#8EBAC0] text-[14px] mb-6 max-w-[720px]">
+            The marketing site and CarbonMRV app are separate. Use <strong className="text-white font-semibold">Request access</strong> for a
+            full brief, or the <a href="/login" className="text-[#00E5A0] underline-offset-2 hover:underline">sign-in</a> page
+            to register interest. Our team reviews each submission, then follows up to grant access after verification.
           </p>
+          <div className="grid sm:grid-cols-2 gap-4 text-[14px]">
+            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
+              <div className="text-[#7A9A9E] text-[12px] font-bold uppercase tracking-wider mb-1">connect_requests</div>
+              <p className="text-white font-medium">Detailed access requests and use cases (MongoDB).</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
+              <div className="text-[#7A9A9E] text-[12px] font-bold uppercase tracking-wider mb-1">websitelogin</div>
+              <p className="text-white font-medium">Sign-in interest and pending verification status (MongoDB).</p>
+            </div>
+          </div>
         </div>
       </SectionWrapper>
 
@@ -1085,10 +999,10 @@ export default function Home() {
           <div>
             <h4 className="font-extrabold text-white text-[13px] uppercase tracking-wider mb-5">Products</h4>
             <ul className="space-y-3 flex flex-col text-[14px] text-[#7A9A9E] font-medium">
-              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Platform Core</a>
-              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Carbon Accounting</a>
-              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Agricultural Modules</a>
-              <a href="#integrations" className="hover:text-[#00E5A0] transition-colors self-start">Integration Setup</a>
+              <a href="#platform" className="hover:text-[#00E5A0] transition-colors self-start">Platform Core</a>
+              <a href="#carbon" className="hover:text-[#00E5A0] transition-colors self-start">Carbon MRV</a>
+              <a href="#nexus" className="hover:text-[#00E5A0] transition-colors self-start">Nexus Agri</a>
+              <a href="#integrations" className="hover:text-[#00E5A0] transition-colors self-start">Access &amp; verification</a>
             </ul>
           </div>
 
