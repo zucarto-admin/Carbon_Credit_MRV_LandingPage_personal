@@ -1,21 +1,15 @@
 "use client";
 
-import { motion, useScroll, useTransform, useInView, animate, AnimatePresence } from "framer-motion";
+import { motion, useInView, animate, AnimatePresence } from "framer-motion";
 import {
   Leaf,
   Map as MapIcon,
   ChevronRight,
-  PlayCircle,
   BarChart3,
-  Tractor,
   Layers,
   ShieldCheck,
-  Zap,
-  Globe2,
   Menu,
   X,
-  Target,
-  Database,
   LineChart,
   CheckCircle2,
   Lock,
@@ -30,7 +24,12 @@ import {
   Radio,
   Activity,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type FormEvent } from "react";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zucarto-carbon-frontend.onrender.com";
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "hello@zucarto.com";
+type PlatformStatus = "checking" | "live" | "unavailable";
+type RequestStatus = "idle" | "submitting" | "success" | "error";
 
 // ─── Animated counter ────────────────────────────────────────────────────────
 function AnimatedNumber({
@@ -94,13 +93,16 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ["start start", "end start"],
+  const [platformStatus, setPlatformStatus] = useState<PlatformStatus>("checking");
+  const [requestStatus, setRequestStatus] = useState<RequestStatus>("idle");
+  const [requestError, setRequestError] = useState("");
+  const [requestForm, setRequestForm] = useState({
+    fullName: "",
+    email: "",
+    company: "",
+    hectaresRange: "under-500",
+    useCase: "",
   });
-  const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "25%"]);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   // Tab State for Products
   const [activeProductTab, setActiveProductTab] = useState<"carbon" | "nexus">("carbon");
@@ -196,6 +198,76 @@ export default function Home() {
     "Third-Party Standard Alignment",
   ];
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkPlatformStatus = async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        // `no-cors` allows a reachability check against cross-origin frontend deployments.
+        await fetch(APP_URL, {
+          method: "GET",
+          mode: "no-cors",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (isMounted) setPlatformStatus("live");
+      } catch {
+        if (isMounted) setPlatformStatus("unavailable");
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    void checkPlatformStatus();
+    const intervalId = setInterval(() => {
+      void checkPlatformStatus();
+    }, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const handleRequestSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRequestStatus("submitting");
+    setRequestError("");
+
+    try {
+      const response = await fetch("/api/connect-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestForm),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        setRequestStatus("error");
+        setRequestError(data.error ?? "Unable to submit request. Please try again.");
+        return;
+      }
+
+      setRequestStatus("success");
+      setRequestForm({
+        fullName: "",
+        email: "",
+        company: "",
+        hectaresRange: "under-500",
+        useCase: "",
+      });
+    } catch {
+      setRequestStatus("error");
+      setRequestError("Network issue while submitting. Please try again.");
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-[linear-gradient(to_bottom,#081112,#05090a)] text-[#B9CBCD] font-sans selection:bg-[#00E5A0]/30 selection:text-white overflow-x-hidden">
 
@@ -218,8 +290,20 @@ export default function Home() {
             </div>
             <span className="font-bold text-[18px] tracking-wide text-white drop-shadow-md">Zucarto</span>
             <span className="hidden sm:flex items-center gap-1.5 ml-3 text-[10px] font-bold text-[#00E5A0] border border-[#00E5A0]/30 rounded-full px-2 py-0.5 bg-[#00E5A0]/10 shadow-[0_0_8px_rgba(0,229,160,0.15)]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5A0] animate-pulse" />
-              Live Platform
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  platformStatus === "live"
+                    ? "bg-[#00E5A0] animate-pulse"
+                    : platformStatus === "checking"
+                      ? "bg-amber-400 animate-pulse"
+                      : "bg-red-400"
+                }`}
+              />
+              {platformStatus === "live"
+                ? "Platform Live"
+                : platformStatus === "checking"
+                  ? "Checking Status"
+                  : "Platform Unavailable"}
             </span>
           </a>
 
@@ -232,9 +316,21 @@ export default function Home() {
 
           {/* Desktop CTAs */}
           <div className="hidden lg:flex items-center gap-5">
-            <button className="text-[14px] font-semibold text-[#8EBAC0] hover:text-white transition-colors">Log In</button>
-            <a href="#pricing" className="bg-[#00E5A0] text-[#05090a] font-bold px-5 py-2.5 rounded-full text-[13px] flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,160,0.4)] hover:shadow-[0_0_25px_rgba(0,229,160,0.6)] hover:bg-white transition-all transform hover:-translate-y-0.5">
-              Request Demo <ArrowUpRight className="w-3.5 h-3.5" />
+            <a
+              href={`${APP_URL}/login`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[14px] font-semibold text-[#8EBAC0] hover:text-white transition-colors"
+            >
+              Log In
+            </a>
+            <a
+              href={APP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-[#00E5A0] text-[#05090a] font-bold px-5 py-2.5 rounded-full text-[13px] flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,160,0.4)] hover:shadow-[0_0_25px_rgba(0,229,160,0.6)] hover:bg-white transition-all transform hover:-translate-y-0.5"
+            >
+              Open Platform <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           </div>
 
@@ -261,8 +357,22 @@ export default function Home() {
                 <a key={l.label} href={l.href} onClick={() => setIsMobileMenuOpen(false)} className="block text-[16px] font-semibold text-white py-2">{l.label}</a>
               ))}
               <div className="pt-4 flex flex-col gap-3">
-                <button className="bg-transparent border border-white/20 text-white font-bold rounded-full py-3 text-sm">Log In</button>
-                <button className="bg-[#00E5A0] text-[#05090a] font-bold rounded-full py-3 text-sm flex justify-center items-center gap-2">Request Demo <ArrowUpRight className="w-4 h-4" /></button>
+                <a
+                  href={`${APP_URL}/login`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-transparent border border-white/20 text-white font-bold rounded-full py-3 text-sm text-center"
+                >
+                  Log In
+                </a>
+                <a
+                  href={APP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-[#00E5A0] text-[#05090a] font-bold rounded-full py-3 text-sm flex justify-center items-center gap-2"
+                >
+                  Open Platform <ArrowUpRight className="w-4 h-4" />
+                </a>
               </div>
             </motion.div>
           )}
@@ -338,10 +448,18 @@ export default function Home() {
             transition={{ duration: 0.4, delay: 0.25 }}
             className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 w-full"
           >
-            <a href="#carbon" className="w-full sm:w-auto bg-[#00E5A0] hover:bg-[#00FFB2] text-[#05090a] font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,229,160,0.3)] transition-all transform hover:-translate-y-1">
-              <BarChart3 className="w-4.5 h-4.5" /> Run Carbon Assessment
+            <a
+              href="#request-access"
+              className="w-full sm:w-auto bg-[#00E5A0] hover:bg-[#00FFB2] text-[#05090a] font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,229,160,0.3)] transition-all transform hover:-translate-y-1"
+            >
+              <BarChart3 className="w-4.5 h-4.5" /> Request Access
             </a>
-            <a href="#nexus" className="w-full sm:w-auto bg-[#173032] hover:bg-[#1E3E40] border border-white/10 text-white font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-lg transition-all transform hover:-translate-y-1">
+            <a
+              href={`${APP_URL}/login`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full sm:w-auto bg-[#173032] hover:bg-[#1E3E40] border border-white/10 text-white font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-lg transition-all transform hover:-translate-y-1"
+            >
               <Sprout className="w-4.5 h-4.5 text-[#00E5A0]" /> Explore Nexus Agri
             </a>
           </motion.div>
@@ -454,8 +572,13 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                    <a href="#" className="bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md">
-                      Explore Carbon MRV <ChevronRight className="w-4 h-4" />
+                    <a
+                      href={APP_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md"
+                    >
+                      Start Carbon Workflow <ChevronRight className="w-4 h-4" />
                     </a>
                   </div>
                   {/* Right side visual */}
@@ -518,8 +641,13 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                    <a href="#" className="bg-white hover:bg-gray-200 text-[#05090a] py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md">
-                      Explore Nexus Agri <ChevronRight className="w-4 h-4" />
+                    <a
+                      href={APP_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-white hover:bg-gray-200 text-[#05090a] py-3 px-6 rounded-full text-sm font-bold inline-flex items-center gap-2 transition-all shadow-md"
+                    >
+                      Launch Nexus Module <ChevronRight className="w-4 h-4" />
                     </a>
                   </div>
                    {/* Right side visual */}
@@ -723,7 +851,14 @@ export default function Home() {
               <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Up to 500 Hectares</li>
               <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Standard Level Outputs</li>
             </ul>
-            <button className="w-full bg-[#1A3333] hover:bg-[#204040] border border-white/10 text-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-sm">Start Pilot</button>
+            <a
+              href={`${APP_URL}/login`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full bg-[#1A3333] hover:bg-[#204040] border border-white/10 text-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-sm text-center"
+            >
+              Start Pilot
+            </a>
           </div>
 
           {/* Professional */}
@@ -740,7 +875,12 @@ export default function Home() {
               <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Advanced Uncertainty modelling</li>
               <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Priority infrastructure pool</li>
             </ul>
-            <button className="w-full bg-[#00E5A0] text-[#05090a] hover:bg-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-[0_0_15px_rgba(0,229,160,0.4)]">Contact Sales</button>
+            <a
+              href={`mailto:${DEMO_EMAIL}?subject=Zucarto%20Professional%20Plan%20Inquiry`}
+              className="w-full bg-[#00E5A0] text-[#05090a] hover:bg-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-[0_0_15px_rgba(0,229,160,0.4)] text-center"
+            >
+              Contact Sales
+            </a>
           </div>
 
           {/* Enterprise */}
@@ -754,12 +894,154 @@ export default function Home() {
                <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Custom Analytics Configuration</li>
                <li className="flex gap-3"><CheckCircle2 className="w-5 h-5 text-[#00E5A0] shrink-0" />Dedicated Compute Layer</li>
             </ul>
-            <button className="w-full bg-[#1A3333] hover:bg-[#204040] border border-white/10 text-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-sm">Contact Support</button>
+            <a
+              href={`mailto:${DEMO_EMAIL}?subject=Zucarto%20Enterprise%20Discussion`}
+              className="w-full bg-[#1A3333] hover:bg-[#204040] border border-white/10 text-white font-bold py-3.5 rounded-full text-[14px] transition-colors shadow-sm text-center"
+            >
+              Contact Support
+            </a>
           </div>
         </div>
       </SectionWrapper>
 
-      {/* ── I. Final CTA ──────────────────────────────────────────────────── */}
+      {/* ── I. Integration Guide ───────────────────────────────────────────── */}
+      <SectionWrapper id="integrations" className="py-8 md:py-12">
+        <div className="bg-[#0E1A1A] border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <SectionLabel>Live Integrations</SectionLabel>
+              <h3 className="text-[1.6rem] md:text-[2rem] font-bold text-white">Production Endpoints Connected</h3>
+            </div>
+            <a
+              href={APP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-[#00E5A0] text-[#05090a] font-bold px-5 py-2.5 rounded-full text-[13px] inline-flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,160,0.35)]"
+            >
+              Open Deployed App <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 text-[14px]">
+            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
+              <div className="text-[#7A9A9E] mb-1">Frontend App URL</div>
+              <div className="text-white font-semibold break-all">{APP_URL}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#122627] p-4">
+              <div className="text-[#7A9A9E] mb-1">Authentication</div>
+              <div className="text-white font-semibold break-all">
+                Managed inside the deployed app
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#122627] px-3 py-1.5 text-[12px] font-semibold text-[#B9CBCD]">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                platformStatus === "live"
+                  ? "bg-[#00E5A0]"
+                  : platformStatus === "checking"
+                    ? "bg-amber-400"
+                    : "bg-red-400"
+              }`}
+            />
+            {platformStatus === "live"
+              ? "Live status confirmed"
+              : platformStatus === "checking"
+                ? "Checking live status"
+                : "Live status unavailable"}
+          </div>
+          <p className="mt-5 text-[13px] text-[#8EBAC0]">
+            Public values are safe for browser use. Secrets must stay in server-side environment variables only.
+          </p>
+        </div>
+      </SectionWrapper>
+
+      {/* ── J. Request Access ─────────────────────────────────────────────── */}
+      <SectionWrapper id="request-access" className="py-8 md:py-12">
+        <div className="bg-[#0E1A1A] border border-white/10 rounded-3xl p-6 md:p-8 shadow-xl">
+          <SectionLabel>Access Workflow</SectionLabel>
+          <h3 className="text-[1.8rem] md:text-[2.2rem] font-bold text-white mb-3">Request platform access</h3>
+          <p className="text-[#8EBAC0] text-[14px] mb-6">
+            Your request goes into the `connect_requests` collection in `zucarto_production`.
+            Approved users are then provisioned via `websitelogin`.
+          </p>
+          <form className="grid md:grid-cols-2 gap-4" onSubmit={handleRequestSubmit}>
+            <input
+              value={requestForm.fullName}
+              onChange={(event) =>
+                setRequestForm((prev) => ({ ...prev, fullName: event.target.value }))
+              }
+              required
+              minLength={2}
+              maxLength={120}
+              placeholder="Full Name"
+              className="bg-[#122627] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#5A7A7E] outline-none focus:border-[#00E5A0]/60"
+            />
+            <input
+              value={requestForm.email}
+              onChange={(event) =>
+                setRequestForm((prev) => ({ ...prev, email: event.target.value }))
+              }
+              required
+              type="email"
+              maxLength={254}
+              placeholder="Business Email"
+              className="bg-[#122627] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#5A7A7E] outline-none focus:border-[#00E5A0]/60"
+            />
+            <input
+              value={requestForm.company}
+              onChange={(event) =>
+                setRequestForm((prev) => ({ ...prev, company: event.target.value }))
+              }
+              required
+              maxLength={160}
+              placeholder="Company / Organization"
+              className="bg-[#122627] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#5A7A7E] outline-none focus:border-[#00E5A0]/60"
+            />
+            <select
+              value={requestForm.hectaresRange}
+              onChange={(event) =>
+                setRequestForm((prev) => ({ ...prev, hectaresRange: event.target.value }))
+              }
+              className="bg-[#122627] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#00E5A0]/60"
+            >
+              <option value="under-500">Under 500 hectares</option>
+              <option value="500-5000">500 to 5,000 hectares</option>
+              <option value="5000-100000">5,000 to 100,000 hectares</option>
+              <option value="100000-plus">100,000+ hectares</option>
+            </select>
+            <textarea
+              value={requestForm.useCase}
+              onChange={(event) =>
+                setRequestForm((prev) => ({ ...prev, useCase: event.target.value }))
+              }
+              required
+              minLength={20}
+              maxLength={1200}
+              placeholder="Describe your use case"
+              className="md:col-span-2 min-h-[130px] bg-[#122627] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#5A7A7E] outline-none focus:border-[#00E5A0]/60"
+            />
+            <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3">
+              <button
+                type="submit"
+                disabled={requestStatus === "submitting"}
+                className="bg-[#00E5A0] disabled:opacity-70 disabled:cursor-not-allowed hover:bg-white text-[#05090a] font-bold px-8 py-3 rounded-full text-[14px] transition-colors"
+              >
+                {requestStatus === "submitting" ? "Submitting..." : "Submit Request"}
+              </button>
+              {requestStatus === "success" && (
+                <span className="text-[#00E5A0] text-[13px] font-semibold">
+                  Request submitted. Our team will contact you shortly.
+                </span>
+              )}
+              {requestStatus === "error" && (
+                <span className="text-red-400 text-[13px] font-semibold">{requestError}</span>
+              )}
+            </div>
+          </form>
+        </div>
+      </SectionWrapper>
+
+      {/* ── K. Final CTA ──────────────────────────────────────────────────── */}
       <section className="relative py-20 my-10 mx-6 max-w-[1280px] xl:mx-auto bg-[#0A2626] rounded-[40px] border border-[#00E5A0]/20 shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_0_80px_rgba(0,229,160,0.1)] overflow-hidden">
         <div className="absolute top-0 left-0 w-[400px] h-[400px] bg-[#00E5A0] blur-[150px] opacity-[0.1] -ml-[200px] -mt-[200px] pointer-events-none rounded-full" />
         <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-[#00E5A0] blur-[120px] opacity-[0.08] -mr-[100px] -mb-[100px] pointer-events-none rounded-full" />
@@ -771,17 +1053,23 @@ export default function Home() {
             Transition from manual processes to scalable, verifiable data intelligence with zero code.
           </p>
           <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4">
-            <a href="#pricing" className="bg-[#00E5A0] hover:bg-white text-[#05090a] font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,229,160,0.3)] transition-all transform hover:-translate-y-1">
-              Start Free Assessment <ArrowUpRight className="w-4.5 h-4.5" />
+            <a
+              href="#request-access"
+              className="bg-[#00E5A0] hover:bg-white text-[#05090a] font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,229,160,0.3)] transition-all transform hover:-translate-y-1"
+            >
+              Start Access Request <ArrowUpRight className="w-4.5 h-4.5" />
             </a>
-            <button className="bg-[#122A2A] hover:bg-[#1A3838] border border-white/10 text-white font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-lg transition-all transform hover:-translate-y-1">
+            <a
+              href={`mailto:${DEMO_EMAIL}?subject=Need%20Zucarto%20Process%20Overview`}
+              className="bg-[#122A2A] hover:bg-[#1A3838] border border-white/10 text-white font-bold px-8 py-3.5 rounded-full text-[14px] flex items-center justify-center gap-2 shadow-lg transition-all transform hover:-translate-y-1"
+            >
                Request Process Overview
-            </button>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ── J. Footer ─────────────────────────────────────────────────────── */}
+      {/* ── L. Footer ─────────────────────────────────────────────────────── */}
       <footer className="border-t border-[#00E5A0]/10 bg-[#040808] pt-16 pb-10 px-6">
         <div className="max-w-[1280px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-1">
@@ -797,18 +1085,20 @@ export default function Home() {
           <div>
             <h4 className="font-extrabold text-white text-[13px] uppercase tracking-wider mb-5">Products</h4>
             <ul className="space-y-3 flex flex-col text-[14px] text-[#7A9A9E] font-medium">
-              {["Platform Core", "Carbon Accounting", "Agricultural Modules", "Analysis Standards"].map((l) => (
-                <a key={l} href="#" className="hover:text-[#00E5A0] transition-colors self-start">{l}</a>
-              ))}
+              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Platform Core</a>
+              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Carbon Accounting</a>
+              <a href={APP_URL} target="_blank" rel="noreferrer" className="hover:text-[#00E5A0] transition-colors self-start">Agricultural Modules</a>
+              <a href="#integrations" className="hover:text-[#00E5A0] transition-colors self-start">Integration Setup</a>
             </ul>
           </div>
 
           <div>
             <h4 className="font-extrabold text-white text-[13px] uppercase tracking-wider mb-5">Company</h4>
             <ul className="space-y-3 flex flex-col text-[14px] text-[#7A9A9E] font-medium">
-              {["About", "Global Partners", "News & Updates", "Contact Hub"].map((l) => (
-                <a key={l} href="#" className="hover:text-white transition-colors self-start">{l}</a>
-              ))}
+              <a href="#" className="hover:text-white transition-colors self-start">About</a>
+              <a href="#" className="hover:text-white transition-colors self-start">Global Partners</a>
+              <a href="#" className="hover:text-white transition-colors self-start">News & Updates</a>
+              <a href={`mailto:${DEMO_EMAIL}`} className="hover:text-white transition-colors self-start">Contact Hub</a>
             </ul>
           </div>
 

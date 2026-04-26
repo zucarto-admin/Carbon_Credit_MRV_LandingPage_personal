@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) landing page for Zucarto, integrated with the deployed platform app.
 
 ## Getting Started
 
@@ -17,6 +17,31 @@ bun dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+## Integration Setup
+
+1. Create a local `.env` file in project root.
+2. Set these values:
+   - `NEXT_PUBLIC_APP_URL` -> frontend app URL (example: `https://zucarto-carbon-frontend.onrender.com`)
+   - `NEXT_PUBLIC_DEMO_EMAIL` -> sales/support contact mailbox
+   - `MONGODB_URL` -> MongoDB connection string (server-side only)
+   - `MONGODB_DB_NAME` -> database name (example: `zucarto_production`)
+3. Restart the dev server after changing env vars.
+
+## Access Request Storage
+
+- The landing page includes a `Request Access` form.
+- Submissions are sent to `POST /api/connect-requests`.
+- Records are stored in:
+  - `connect_requests` (lead + approval workflow source)
+  - `websitelogin` (index prepared for approved user provisioning)
+
+## Key and Secret Handling
+
+- Only expose browser-safe values with `NEXT_PUBLIC_` variables.
+- Never store private API keys, DB credentials, or signing secrets in the landing page repo.
+- Keep private secrets in server-side environments only (backend service, serverless routes, or deployment secret manager).
+- If the landing page needs a protected integration, proxy via backend endpoints instead of calling third-party providers directly from the browser.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
